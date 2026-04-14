@@ -69,7 +69,13 @@
 
 ## 第四步：前端 API 根地址（当前实现）
 
-记账页已在 [`public/app.js`](../public/app.js) 顶部通过常量 **`API_BASE_ORIGIN`** 固定 Vercel 根地址；更换域名时请改该常量并重新部署 Pages。
+默认根地址在 [`public/app.js`](../public/app.js) 的 **`DEFAULT_API_BASE_ORIGIN`**。若你的 **Production URL** 与之不同，可二选一：
+
+- 改 `DEFAULT_API_BASE_ORIGIN` 后重新部署 Pages；或  
+- 在 [`public/index.html`](../public/index.html) 里、在加载 `app.js` **之前**取消注释并设置：  
+  `window.__VBR_API_BASE_ORIGIN__ = 'https://你的项目.vercel.app'`（仅 URL，**不要**写密钥）。
+
+**CORS 已配对但仍提示「请求在收到响应前就失败」**：若 Network 里**没有** `(blocked:cors)`，通常不是 CORS，而是本机到 `*.vercel.app` 的网络问题（内地环境较常见）。可在新标签直接访问 `https://你的项目.vercel.app/api/expenses` 验证；若同样打不开，需换网络、VPN，或为 Vercel 绑定**可访问的自定义域名**后再用 `__VBR_API_BASE_ORIGIN__` 指向它（`CORS_ORIGIN` 仍填 GitHub Pages 的 **Origin**，即 `https://用户名.github.io`，一般**不必**把 API 域名写进 `CORS_ORIGIN`）。
 
 若 Vercel 启用了 **API_GATE_TOKEN**：当前静态页不再提供门令输入，请在服务端关闭门令，或自行恢复客户端配置方式。
 

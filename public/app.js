@@ -1,11 +1,28 @@
 (function () {
-  /** 固定 API 根（Vercel Production，无尾斜杠、无密钥；与 CORS 白名单中的 Pages 源配对） */
-  const API_BASE_ORIGIN = 'https://voice-bill-record.vercel.app';
+  /** 默认 API 根；可在 index.html 里先于本脚本设置 window.__VBR_API_BASE_ORIGIN__ 覆盖（勿写密钥） */
+  const DEFAULT_API_BASE_ORIGIN = 'https://voice-bill-record.vercel.app';
+
+  function resolveApiBaseOrigin() {
+    try {
+      const w = typeof window !== 'undefined' ? window.__VBR_API_BASE_ORIGIN__ : '';
+      if (typeof w === 'string' && w.trim()) {
+        const u = new URL(w.trim());
+        if (u.protocol === 'https:' || u.hostname === 'localhost') {
+          return `${u.protocol}//${u.host}`;
+        }
+      }
+    } catch (_) {
+      /* 非法覆盖则忽略 */
+    }
+    return DEFAULT_API_BASE_ORIGIN.replace(/\/+$/, '');
+  }
+
+  const API_BASE_ORIGIN = resolveApiBaseOrigin();
 
   const $ = (id) => document.getElementById(id);
 
   function getApiBase() {
-    return API_BASE_ORIGIN.replace(/\/$/, '');
+    return API_BASE_ORIGIN.replace(/\/+$/, '');
   }
 
   function apiUrl(path) {
@@ -26,9 +43,9 @@
       const base = getApiBase();
       const originHint =
         typeof location !== 'undefined' && location.origin
-          ? ` CORS：在 Vercel 的 CORS_ORIGIN 中加入与 Network 里 Request Headers → Origin 一致的值（一般为 ${location.origin}），保存后务必 Redeploy；也可加一项 https://*.github.io。`
-          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前页的 Origin。';
-      const netHint = ` 先打开 Network 看失败原因：有 (blocked:cors) 再查 CORS；若是 failed / ERR_* / 长时间无响应，多为本机访问 ${base} 的网络问题，或 API_BASE_ORIGIN 与 Vercel Production 域名不一致。`;
+          ? ` 仅当 Network 里出现 (blocked:cors) 时再核对 CORS_ORIGIN（须含 ${location.origin} 等）并已 Redeploy。`
+          : ' 若出现 (blocked:cors) 再核对 Vercel 的 CORS_ORIGIN。';
+      const netHint = ` 若无 (blocked:cors)，多半不是 CORS：在内地常见为无法稳定访问 *.vercel.app（与 CORS_ORIGIN 无关）。请在新标签直接打开 ${base}/api/expenses ——若也打不开，请换网络/VPN/手机流量，或为 Vercel 绑定自定义域名后在 index.html 用 __VBR_API_BASE_ORIGIN__ 指向该域名。`;
       return `无法连接记账服务（请求在收到响应前就失败了）。${netHint}${originHint}`;
     }
     return raw || '请求失败';

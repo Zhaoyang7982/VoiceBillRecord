@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+.DS_Store
+
+# 环境变量与密钥（勿提交真实值）
+.env
+.env.local
+.env.*.local
+.env.production
+.env.*.production

@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # 仓库中存在 package-lock.json 时，可改为 npm ci 以提高可复现性
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test

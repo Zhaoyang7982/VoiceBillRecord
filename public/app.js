@@ -23,11 +23,13 @@
       /^failed to fetch$/i.test(raw) ||
       /networkerror|network request failed|load failed/i.test(raw)
     ) {
+      const base = getApiBase();
       const originHint =
         typeof location !== 'undefined' && location.origin
-          ? ` 请在 Vercel 的 CORS_ORIGIN 中加入（与 Network 里 Request Headers 的 Origin 一致，一般不含 /VoiceBillRecord 路径）：${location.origin} ；若仍失败可再加一项 https://*.github.io 后 Redeploy。`
-          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前页的 Origin（协议+主机+端口，无路径）。';
-      return `无法连接记账服务（多为跨域或网络到 Vercel 不通）。${originHint}`;
+          ? ` CORS：在 Vercel 的 CORS_ORIGIN 中加入与 Network 里 Request Headers → Origin 一致的值（一般为 ${location.origin}），保存后务必 Redeploy；也可加一项 https://*.github.io。`
+          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前页的 Origin。';
+      const netHint = ` 若已配置仍如此：打开 Network，点失败请求——出现 (blocked:cors) 才是跨域；若是 failed / ERR_* / 挂起很久，多为本机到 ${base} 的网络或域名写错（请确认 public/app.js 里 API_BASE_ORIGIN 与 Vercel Production 域名一致）。`;
+      return `无法连接记账服务（请求在收到响应前就失败了）。${originHint}${netHint}`;
     }
     return raw || '请求失败';
   }

@@ -65,15 +65,11 @@
 
 ---
 
-## 第四步：前端「API 根地址」与 Pages 对齐
+## 第四步：前端 API 根地址（当前实现）
 
-在 **GitHub Pages** 打开的站点中：
+记账页已在 [`public/app.js`](../public/app.js) 顶部通过常量 **`API_BASE_ORIGIN`** 固定 Vercel 根地址；更换域名时请改该常量并重新部署 Pages。
 
-1. 展开 **可选设置**；
-2. **API 根地址** 填第二步记下的 Vercel Production URL（`https://xxx.vercel.app`，无尾斜杠）；
-3. 点 **保存 API 地址**（写入本机 `localStorage`，换设备需重填）。
-
-或在构建前修改 [`public/index.html`](../public/index.html) 中的 `window.VBR_API_BASE_URL` 为同一地址（适合固定域名发布）。
+若 Vercel 启用了 **API_GATE_TOKEN**：当前静态页不再提供门令输入，请在服务端关闭门令，或自行恢复客户端配置方式。
 
 ---
 

@@ -15,29 +15,8 @@
         <button type="button" data-nav="stats">统计</button>
       </nav>
     </header>
-    <p id="pages-api-hint" class="hint-banner" role="status" hidden></p>
 
     <main id="view-home" class="view" role="region" aria-label="首页">
-      <section class="panel settings">
-        <details>
-          <summary>可选设置（跨域或启用 API 门限时）</summary>
-          <div class="inner">
-            <label class="muted" for="api-base-url">API 根地址（仅 https/http 域名，无路径、无密钥；GitHub Pages 填 Vercel 上的 API 站点，如 https://xxx.vercel.app）</label>
-            <input id="api-base-url" type="url" inputmode="url" autocomplete="off" placeholder="留空表示与当前网页同域" />
-            <div class="row">
-              <button type="button" class="primary" id="save-api-base">保存 API 地址</button>
-              <button type="button" class="ghost" id="clear-api-base">清除</button>
-            </div>
-            <label class="muted" for="gate-token">Authorization Bearer（与部署环境 API_GATE_TOKEN 一致，仅存本机浏览器）</label>
-            <input id="gate-token" type="password" autocomplete="off" placeholder="未启用门限可留空" />
-            <div class="row">
-              <button type="button" class="primary" id="save-gate">保存门令</button>
-              <button type="button" class="ghost" id="clear-gate">清除</button>
-            </div>
-          </div>
-        </details>
-      </section>
-
       <section class="panel">
         <h2>说话记账</h2>
         <p class="muted" id="speech-support-msg">
@@ -105,10 +84,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-    <!-- GitHub Pages 等同域无 /api 时填写 Vercel 根地址（无尾斜杠、无密钥）；用户仍可在「可选设置」覆盖 -->
-    <script>
-      window.VBR_API_BASE_URL = 'https://voice-bill-record.vercel.app';
-    </script>
     <script src="app.js" defer></script>
   </body>
 </html>

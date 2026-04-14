@@ -1,34 +1,35 @@
 (function () {
-  const GATE_KEY = 'vbr_gate_token';
-  const API_BASE_STORAGE_KEY = 'vbr_api_base';
+  /** 固定 API 根（Vercel Production，无尾斜杠、无密钥；与 CORS 白名单中的 Pages 源配对） */
+  const API_BASE_ORIGIN = 'https://voice-bill-record.vercel.app';
 
   const $ = (id) => document.getElementById(id);
 
-  /**
-   * API 根地址（无密钥）：localStorage 优先，其次 index.html 内 window.VBR_API_BASE_URL，留空则同域。
-   * 只使用 URL 的 origin，忽略路径，避免误配成带 secret 的完整 URL。
-   */
   function getApiBase() {
-    const fromLs = localStorage.getItem(API_BASE_STORAGE_KEY);
-    const raw =
-      (fromLs && fromLs.trim()) ||
-      (typeof window !== 'undefined' && window.VBR_API_BASE_URL && String(window.VBR_API_BASE_URL).trim()) ||
-      '';
-    if (!raw) return '';
-    try {
-      const u = new URL(raw);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      if (raw.toLowerCase().includes('postgresql:') || raw.includes('@')) return '';
-      return u.origin;
-    } catch {
-      return '';
-    }
+    return API_BASE_ORIGIN.replace(/\/$/, '');
   }
 
   function apiUrl(path) {
     const p = path.startsWith('/') ? path : `/${path}`;
-    const base = getApiBase();
-    return base ? `${base}${p}` : p;
+    return `${getApiBase()}${p}`;
+  }
+
+  function friendlyFetchError(e, status) {
+    const raw = (e && e.message) || '';
+    if (status === 401) {
+      return '未授权（401）：请在 Vercel 关闭 API_GATE_TOKEN，或为客户端恢复门令配置方式。';
+    }
+    if (
+      /^load failed$/i.test(raw) ||
+      /^failed to fetch$/i.test(raw) ||
+      /networkerror|network request failed|load failed/i.test(raw)
+    ) {
+      return '无法连接记账服务（请检查网络；从 GitHub Pages 访问时，请确认 Vercel 环境变量 CORS_ORIGIN 包含当前站点来源，如 https://zhaoyang7982.github.io）。';
+    }
+    return raw || '请求失败';
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json' };
   }
 
   const views = {
@@ -57,18 +58,20 @@
     return localYMD(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   }
 
-  function authHeaders() {
-    const token = localStorage.getItem(GATE_KEY);
-    const h = { 'Content-Type': 'application/json' };
-    if (token) h.Authorization = `Bearer ${token}`;
-    return h;
-  }
-
   async function apiFetch(path, opts) {
-    const res = await fetch(apiUrl(path), {
-      ...opts,
-      headers: { ...authHeaders(), ...(opts && opts.headers ? opts.headers : {}) },
-    });
+    let res;
+    try {
+      res = await fetch(apiUrl(path), {
+        mode: 'cors',
+        credentials: 'omit',
+        ...opts,
+        headers: { ...authHeaders(), ...(opts && opts.headers ? opts.headers : {}) },
+      });
+    } catch (e) {
+      const err = new Error(friendlyFetchError(e));
+      err.cause = e;
+      throw err;
+    }
     const text = await res.text();
     let data = null;
     try {
@@ -78,9 +81,8 @@
     }
     if (!res.ok) {
       let msg = data && data.message ? data.message : `请求失败 ${res.status}`;
-      if (res.status === 404 && !getApiBase()) {
-        msg =
-          '请求 404：未配置 API 根地址。GitHub Pages 没有后端接口，请展开「可选设置」，填写 Vercel 上的地址（如 https://xxx.vercel.app）并点「保存 API 地址」。';
+      if (res.status === 404) {
+        msg = '接口返回 404：请确认 Vercel 项目已部署且路径为 /api/parse、/api/expenses。';
       }
       const err = new Error(msg);
       err.status = res.status;
@@ -108,71 +110,6 @@
       if (name === 'stats') loadStats();
     });
   });
-
-  function fillApiBaseInput() {
-    const el = $('api-base-url');
-    if (!el) return;
-    el.value = localStorage.getItem(API_BASE_STORAGE_KEY) || getApiBase() || '';
-  }
-
-  function updatePagesApiHint() {
-    const el = $('pages-api-hint');
-    if (!el) return;
-    if (!getApiBase() && /github\.io$/i.test(location.hostname)) {
-      el.hidden = false;
-      el.textContent =
-        '当前在 GitHub Pages：请先展开下方「可选设置」，把「API 根地址」填成你的 Vercel 站点（https://xxx.vercel.app，无尾斜杠），再点「保存 API 地址」，否则无法解析与记账。';
-    } else {
-      el.hidden = true;
-      el.textContent = '';
-    }
-  }
-
-  $('save-api-base').addEventListener('click', () => {
-    const raw = $('api-base-url').value.trim();
-    if (!raw) {
-      localStorage.removeItem(API_BASE_STORAGE_KEY);
-      $('parse-status').textContent = '已清除 API 根地址，将使用与当前页同域的 /api/*。';
-      fillApiBaseInput();
-      updatePagesApiHint();
-      return;
-    }
-    try {
-      const u = new URL(raw);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('仅支持 http/https');
-      if (raw.toLowerCase().includes('postgresql:') || raw.includes('@')) {
-        throw new Error('请勿粘贴数据库连接串');
-      }
-      const origin = u.origin;
-      localStorage.setItem(API_BASE_STORAGE_KEY, origin);
-      $('api-base-url').value = origin;
-      $('parse-status').textContent = `API 根地址已保存：${origin}`;
-      updatePagesApiHint();
-    } catch (e) {
-      $('parse-status').textContent = e instanceof Error ? e.message : 'API 地址无效';
-    }
-  });
-  $('clear-api-base').addEventListener('click', () => {
-    localStorage.removeItem(API_BASE_STORAGE_KEY);
-    fillApiBaseInput();
-    $('parse-status').textContent = '已清除 API 根地址。';
-    updatePagesApiHint();
-  });
-  fillApiBaseInput();
-  updatePagesApiHint();
-
-  $('save-gate').addEventListener('click', () => {
-    const v = $('gate-token').value.trim();
-    if (v) localStorage.setItem(GATE_KEY, v);
-    else localStorage.removeItem(GATE_KEY);
-    $('parse-status').textContent = '门令已保存到本机（若留空则清除）。';
-  });
-  $('clear-gate').addEventListener('click', () => {
-    localStorage.removeItem(GATE_KEY);
-    $('gate-token').value = '';
-    $('parse-status').textContent = '已清除门令。';
-  });
-  $('gate-token').value = localStorage.getItem(GATE_KEY) || '';
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechMsg = $('speech-support-msg');
@@ -325,7 +262,7 @@
     if (!text) {
       parseError.hidden = false;
       parseError.textContent =
-        '请先在文本框里输入或说话（说完请松手/点停止，临时识别会自动写入）；若在 GitHub Pages，还需在「可选设置」里配置 Vercel API 根地址。';
+        '请先在文本框里输入或说话（说完请松手/点停止，临时识别会自动写入文本框）。';
       return;
     }
     parseStatus.textContent = '解析中…';
@@ -334,6 +271,9 @@
         method: 'POST',
         body: JSON.stringify({ text }),
       });
+      if (!data || typeof data.parsed !== 'object') {
+        throw new Error((data && data.message) || '解析接口返回数据异常');
+      }
       showParsed(data.parsed);
       parseStatus.textContent = '解析完成。';
       if (data.parsed.amount === null || data.parsed.amount === undefined) {
@@ -342,7 +282,7 @@
       }
     } catch (e) {
       parseError.hidden = false;
-      parseError.textContent = e.message || '解析失败';
+      parseError.textContent = friendlyFetchError(e, e.status) || e.message || '解析失败';
       parseStatus.textContent = '';
     }
   });
@@ -366,7 +306,7 @@
       await loadHome();
     } catch (e) {
       parseError.hidden = false;
-      parseError.textContent = e.message || '保存失败';
+      parseError.textContent = friendlyFetchError(e, e.status) || e.message || '保存失败';
       parseStatus.textContent = '';
     }
   });
@@ -404,14 +344,14 @@
       });
       if (!items.length) {
         const li = document.createElement('li');
-        li.innerHTML = '<span class="muted">今日暂无记录</span>';
+        li.innerHTML = '<span class="muted">请语音输入账单，当前还没有账单</span>';
         listEl.appendChild(li);
       }
     } catch (e) {
       totalEl.textContent = '—';
       const li = document.createElement('li');
       li.className = 'error';
-      li.textContent = e.message || '加载失败（请确认已用 vercel dev 或已部署 API）';
+      li.textContent = friendlyFetchError(e, e.status) || e.message || '加载失败';
       listEl.appendChild(li);
     }
   }
@@ -453,7 +393,7 @@
       mount.innerHTML = '';
       const days = Array.from(groups.keys()).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
       if (!days.length) {
-        mount.innerHTML = '<p class="muted">暂无记录</p>';
+        mount.innerHTML = '<p class="muted">请语音输入账单，当前还没有账单</p>';
         return;
       }
       days.forEach((day) => {
@@ -481,7 +421,7 @@
         mount.appendChild(wrap);
       });
     } catch (e) {
-      mount.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+      mount.innerHTML = `<p class="error">${escapeHtml(friendlyFetchError(e, e.status) || e.message)}</p>`;
     }
   }
 
@@ -542,10 +482,10 @@
         },
       });
       if (!labels.length) {
-        legend.innerHTML = '<li class="muted">本月暂无数据</li>';
+        legend.innerHTML = '<li class="muted">请语音输入账单，当前还没有账单</li>';
       }
     } catch (e) {
-      legend.innerHTML = `<li class="error">${escapeHtml(e.message)}</li>`;
+      legend.innerHTML = `<li class="error">${escapeHtml(friendlyFetchError(e, e.status) || e.message)}</li>`;
     }
   }
 

@@ -105,9 +105,9 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-    <!-- 静态托管（如 GitHub Pages）时填写 API 根地址，仅 https 域名、无密钥；留空则同域相对路径 /api/* -->
+    <!-- GitHub Pages 等同域无 /api 时填写 Vercel 根地址（无尾斜杠、无密钥）；用户仍可在「可选设置」覆盖 -->
     <script>
-      window.VBR_API_BASE_URL = '';
+      window.VBR_API_BASE_URL = 'https://voice-bill-record.vercel.app';
     </script>
     <script src="app.js" defer></script>
   </body>

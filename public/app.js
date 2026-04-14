@@ -41,12 +41,14 @@
       /networkerror|network request failed|load failed/i.test(raw)
     ) {
       const base = getApiBase();
-      const originHint =
-        typeof location !== 'undefined' && location.origin
-          ? ` 仅当 Network 里出现 (blocked:cors) 时再核对 CORS_ORIGIN（须含 ${location.origin} 等）并已 Redeploy。`
-          : ' 若出现 (blocked:cors) 再核对 Vercel 的 CORS_ORIGIN。';
-      const netHint = ` 若无 (blocked:cors)，多半不是 CORS：在内地常见为无法稳定访问 *.vercel.app（与 CORS_ORIGIN 无关）。请在新标签直接打开 ${base}/api/expenses ——若也打不开，请换网络/VPN/手机流量，或为 Vercel 绑定自定义域名后在 index.html 用 __VBR_API_BASE_ORIGIN__ 指向该域名。`;
-      return `无法连接记账服务（请求在收到响应前就失败了）。${netHint}${originHint}`;
+      const origin =
+        typeof location !== 'undefined' && location.origin ? location.origin : '你的 Pages 源';
+      return [
+        '连不上记账接口（浏览器在收到响应前就失败了）。',
+        `1）先试：换流量 / VPN，或新标签打开 ${base}/api/expenses 能否打开。`,
+        '2）仍不行：多为内地访问 *.vercel.app 不稳定；可在 Vercel 绑自定义域名，再在 index.html 里设置 window.__VBR_API_BASE_ORIGIN__ 指向该域名。',
+        `3）仅当开发者工具 Network 里出现 (blocked:cors) 时，才要改 Vercel 的 CORS_ORIGIN（须含 ${origin}）并 Redeploy。`,
+      ].join('\n');
     }
     return raw || '请求失败';
   }
@@ -375,7 +377,7 @@ ${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
       totalEl.textContent = '—';
       const err = document.createElement('div');
       err.className = 'error';
-      err.style.textAlign = 'center';
+      err.style.textAlign = 'start';
       err.textContent = friendlyFetchError(e, e.status) || e.message || '加载失败';
       listEl.appendChild(err);
     }

@@ -280,8 +280,11 @@ button:disabled {
 .error {
   color: #d94a6a;
   font-size: 0.88rem;
-  text-align: center;
+  text-align: start;
   margin: 8px 0;
+  white-space: pre-line;
+  line-height: 1.55;
+  padding: 0 4px;
 }
 
 /* 解析结果卡片 */

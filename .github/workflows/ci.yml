@@ -15,11 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
 
-      # 未提交 package-lock.json 时不要写 cache: npm（否则会报 “lock file not found”）
-      # 本地执行 npm install 后提交 package-lock.json，再把下面两行改回 cache: npm + npm ci
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test

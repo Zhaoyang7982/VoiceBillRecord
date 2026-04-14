@@ -43,7 +43,7 @@
 
 ### 日常命令
 
-- 安装依赖：`npm install`；若已提交 `package-lock.json`，推荐使用 `npm ci`。
+- 安装依赖：克隆后推荐 **`npm ci`**（与 CI 一致）；若刚改了 `package.json` 里的依赖则用 **`npm install`** 并提交更新后的 `package-lock.json`。
 - 运行测试：`npm test`（Vitest，含仓库健康类冒烟断言）。
 - 合并或发布前：勾选 [docs/AGENT_CHECKLIST.md](./docs/AGENT_CHECKLIST.md) 中与本次改动相关的阶段；CI 工作流：`.github/workflows/ci.yml`（`ci`）。
 

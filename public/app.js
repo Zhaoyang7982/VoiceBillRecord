@@ -23,7 +23,11 @@
       /^failed to fetch$/i.test(raw) ||
       /networkerror|network request failed|load failed/i.test(raw)
     ) {
-      return '无法连接记账服务（请检查网络；从 GitHub Pages 访问时，请确认 Vercel 环境变量 CORS_ORIGIN 包含当前站点来源，如 https://zhaoyang7982.github.io）。';
+      const originHint =
+        typeof location !== 'undefined' && location.origin
+          ? ` 请在 Vercel → Settings → Environment Variables 的 CORS_ORIGIN 中加入（整段复制）：${location.origin}`
+          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前网页的完整来源（协议+域名，无路径）。';
+      return `无法连接记账服务（多为跨域被拦或网络问题）。${originHint}`;
     }
     return raw || '请求失败';
   }

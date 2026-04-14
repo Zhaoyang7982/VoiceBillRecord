@@ -22,6 +22,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Cache-bust app.js (避免 Pages/CDN 长期缓存旧脚本)
+        run: |
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          sed -i.bak "s|src=\"app.js\"|src=\"app.js?cb=${short}\"|" public/index.html
+          rm -f public/index.html.bak
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -28,8 +28,8 @@
         typeof location !== 'undefined' && location.origin
           ? ` CORS：在 Vercel 的 CORS_ORIGIN 中加入与 Network 里 Request Headers → Origin 一致的值（一般为 ${location.origin}），保存后务必 Redeploy；也可加一项 https://*.github.io。`
           : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前页的 Origin。';
-      const netHint = ` 若已配置仍如此：打开 Network，点失败请求——出现 (blocked:cors) 才是跨域；若是 failed / ERR_* / 挂起很久，多为本机到 ${base} 的网络或域名写错（请确认 public/app.js 里 API_BASE_ORIGIN 与 Vercel Production 域名一致）。`;
-      return `无法连接记账服务（请求在收到响应前就失败了）。${originHint}${netHint}`;
+      const netHint = ` 先打开 Network 看失败原因：有 (blocked:cors) 再查 CORS；若是 failed / ERR_* / 长时间无响应，多为本机访问 ${base} 的网络问题，或 API_BASE_ORIGIN 与 Vercel Production 域名不一致。`;
+      return `无法连接记账服务（请求在收到响应前就失败了）。${netHint}${originHint}`;
     }
     return raw || '请求失败';
   }

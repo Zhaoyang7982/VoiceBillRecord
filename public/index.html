@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>语音记账 · VoiceBillRecord</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>语音记账</h1>
+      <nav class="tabs" aria-label="主导航">
+        <button type="button" data-nav="home" aria-current="true">首页</button>
+        <button type="button" data-nav="list">列表</button>
+        <button type="button" data-nav="stats">统计</button>
+      </nav>
+    </header>
+
+    <main id="view-home" class="view" role="region" aria-label="首页">
+      <section class="panel settings">
+        <details>
+          <summary>可选设置（跨域或启用 API 门限时）</summary>
+          <div class="inner">
+            <label class="muted" for="api-base-url">API 根地址（仅 https/http 域名，无路径、无密钥；GitHub Pages 填 Vercel 上的 API 站点，如 https://xxx.vercel.app）</label>
+            <input id="api-base-url" type="url" inputmode="url" autocomplete="off" placeholder="留空表示与当前网页同域" />
+            <div class="row">
+              <button type="button" class="primary" id="save-api-base">保存 API 地址</button>
+              <button type="button" class="ghost" id="clear-api-base">清除</button>
+            </div>
+            <label class="muted" for="gate-token">Authorization Bearer（与部署环境 API_GATE_TOKEN 一致，仅存本机浏览器）</label>
+            <input id="gate-token" type="password" autocomplete="off" placeholder="未启用门限可留空" />
+            <div class="row">
+              <button type="button" class="primary" id="save-gate">保存门令</button>
+              <button type="button" class="ghost" id="clear-gate">清除</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>说话记账</h2>
+        <p class="muted" id="speech-support-msg">
+          正在检测语音识别能力…
+        </p>
+        <button type="button" class="big-mic" id="mic-hold" disabled>
+          按住说话（或下方点击切换）
+        </button>
+        <div class="row" style="margin-top: 0.65rem">
+          <button type="button" class="ghost" id="mic-toggle" disabled>点击开始识别</button>
+          <span class="badge" id="rec-state">未录音</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>识别文字</h2>
+        <textarea id="transcript" placeholder="识别结果会出现在这里，也可手动编辑后再解析"></textarea>
+        <div class="row" style="margin-top: 0.65rem">
+          <button type="button" class="primary" id="btn-parse" disabled>解析（AI）</button>
+          <button type="button" class="ghost" id="btn-save" disabled>保存账单</button>
+        </div>
+        <p class="muted" id="parse-status"></p>
+        <p class="error" id="parse-error" hidden></p>
+        <pre
+          id="parse-preview"
+          class="panel"
+          style="display: none; margin-top: 0.65rem; font-size: 0.82rem; overflow: auto"
+        ></pre>
+      </section>
+
+      <section class="panel">
+        <h2>今日总支出</h2>
+        <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0" id="today-total">—</p>
+        <p class="muted">最近几条</p>
+        <ul class="expense-list" id="recent-list"></ul>
+        <div class="row" style="margin-top: 0.65rem">
+          <button type="button" class="ghost" id="refresh-home">刷新</button>
+        </div>
+      </section>
+    </main>
+
+    <main id="view-list" class="view" hidden role="region" aria-label="列表">
+      <section class="panel">
+        <h2>按天分组</h2>
+        <p class="muted">展示最近 60 天内的记录（最多 500 条）</p>
+        <div id="list-mount"></div>
+        <div class="row" style="margin-top: 0.65rem">
+          <button type="button" class="ghost" id="refresh-list">刷新</button>
+        </div>
+      </section>
+    </main>
+
+    <main id="view-stats" class="view" hidden role="region" aria-label="统计">
+      <section class="panel">
+        <h2>本月分类</h2>
+        <p class="muted" id="stats-range"></p>
+        <div class="stats-wrap chart-box">
+          <canvas id="stats-chart" width="400" height="260" aria-label="分类饼图"></canvas>
+        </div>
+        <ul class="expense-list" id="stats-legend"></ul>
+        <div class="row" style="margin-top: 0.65rem">
+          <button type="button" class="ghost" id="refresh-stats">刷新</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <!-- 静态托管（如 GitHub Pages）时填写 API 根地址，仅 https 域名、无密钥；留空则同域相对路径 /api/* -->
+    <script>
+      window.VBR_API_BASE_URL = '';
+    </script>
+    <script src="app.js" defer></script>
+  </body>
+</html>

@@ -25,9 +25,9 @@
     ) {
       const originHint =
         typeof location !== 'undefined' && location.origin
-          ? ` 请在 Vercel → Settings → Environment Variables 的 CORS_ORIGIN 中加入（整段复制）：${location.origin}`
-          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前网页的完整来源（协议+域名，无路径）。';
-      return `无法连接记账服务（多为跨域被拦或网络问题）。${originHint}`;
+          ? ` 请在 Vercel 的 CORS_ORIGIN 中加入（与 Network 里 Request Headers 的 Origin 一致，一般不含 /VoiceBillRecord 路径）：${location.origin} ；若仍失败可再加一项 https://*.github.io 后 Redeploy。`
+          : ' 请在 Vercel 的 CORS_ORIGIN 中加入当前页的 Origin（协议+主机+端口，无路径）。';
+      return `无法连接记账服务（多为跨域或网络到 Vercel 不通）。${originHint}`;
     }
     return raw || '请求失败';
   }

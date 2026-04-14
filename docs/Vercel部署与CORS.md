@@ -56,12 +56,14 @@
 
 - **含义**：允许从哪些 **网页源（Origin）** 跨域调用你的 API。
 - **格式**：`协议 + 主机 + 端口`，**不要**带页面路径；多个源用 **英文逗号** 分隔，例如：  
-  `https://你的用户名.github.io,http://localhost:3000`
+  `http://localhost:3000,https://你的用户名.github.io`  
+  即使地址栏是 `https://你的用户名.github.io/仓库名/`（项目页带路径），浏览器发出的 **Origin 仍是 `https://你的用户名.github.io`**（不含 `/仓库名`）。
 - **如何抄得一字不差**：用浏览器打开 **GitHub Pages 上的记账页** → **F12 → Network** → 点任意一条发往 `vercel.app` 的请求 → **Request Headers → Origin**，把该值粘贴到 Vercel 的 `CORS_ORIGIN`。
+- **可选放宽**：在白名单中加入字面量 **`https://*.github.io`** 时，服务端会放行任意 `*.github.io` 子域（个人项目可用；见 `lib/api-http.js`）。
 
 若填错：控制台会出现 **CORS** 报错，`fetch` 失败（与 DeepSeek、Neon 是否正常无关）。
 
-服务端逻辑：仅当请求的 `Origin` 在白名单内时，才会返回与之匹配的 `Access-Control-Allow-Origin`；**不在名单内的跨域请求不会误用白名单第一项**（见 `lib/api-http.js`）。
+服务端逻辑：仅当请求的 `Origin` 在白名单内（或命中上述 `*.github.io` 规则）时，才会返回与之匹配的 `Access-Control-Allow-Origin`；**不在名单内的跨域请求不会误用白名单第一项**（见 `lib/api-http.js`）。
 
 ---
 

@@ -24,4 +24,8 @@ describe('repo harness', () => {
     expect(existsSync(join(repoRoot, '.env.example'))).toBe(true);
     expect(existsSync(join(repoRoot, 'docs', '环境变量与密钥.md'))).toBe(true);
   });
+
+  it('本地开发环境备忘存在', () => {
+    expect(existsSync(join(repoRoot, 'docs', '本地开发环境.md'))).toBe(true);
+  });
 });

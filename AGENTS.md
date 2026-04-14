@@ -8,6 +8,7 @@
 
 1. [需求文档.md](./需求文档.md) — 功能范围、技术栈、API 形态、安全与部署原则。
 2. [docs/AGENT_CHECKLIST.md](./docs/AGENT_CHECKLIST.md) — 分阶段可勾选清单与完成定义（DoD）。
+3. [docs/本地开发环境.md](./docs/本地开发环境.md) — Node/npm 与项目依赖的关系、`npm install`/`npm test`、镜像与 PATH 备忘。
 
 修改行为或交付物时，应能回指上述文档中的章节；不要引入与需求文档矛盾的密钥或架构。
 
@@ -34,22 +35,7 @@
 
 ## 本地与 CI
 
-### 环境准备（macOS / zsh）
-
-若终端出现 **`zsh: command not found: npm`**，说明本机尚未安装 Node，或 **PATH 未包含 Homebrew 的 `bin`**。
-
-1. **安装 Node（任选其一）**  
-   - Homebrew：`brew install node`（首次可能较慢，需等命令完全结束）。  
-   - 或从 [nodejs.org](https://nodejs.org/) 安装 LTS 安装包（自带 `npm`）。
-
-2. **确保能找到 `brew` 装的命令**（Apple Silicon 常见路径）  
-   在 `~/.zshrc` 中加入一行（若尚无）：  
-   `export PATH="/opt/homebrew/bin:$PATH"`  
-   保存后执行 `source ~/.zshrc`，或**新开一个终端**再试。
-
-3. **验证**  
-   `node -v` 与 `npm -v` 有版本号输出后，在项目根目录执行：  
-   `npm install && npm test`
+**从零到能跑测试**：详见 [docs/本地开发环境.md](./docs/本地开发环境.md)（要点：`brew install node` 为**全机**安装；本仓库需再执行 **`npm install` + `npm test`**；国内网络见镜像文档）。
 
 ### 国内网络（可选）
 

@@ -128,8 +128,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 256,
+        temperature: 0.15,
+        max_tokens: 160,
         stream: false,
       }),
       signal: controller.signal,

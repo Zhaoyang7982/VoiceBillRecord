@@ -8,7 +8,7 @@
   --card-shadow: 0 8px 20px rgba(255, 105, 150, 0.12);
   --card-shadow-hover: 0 12px 28px rgba(255, 105, 150, 0.18);
   --sidebar-w: 70px;
-  --dock-h: 108px;
+  --dock-h: 92px;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
@@ -213,6 +213,31 @@ main.view {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.2s ease;
+}
+
+.parse-btn.is-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.88;
+}
+
+.parse-btn.is-loading::after {
+  content: '';
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.45em;
+  vertical-align: -0.1em;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .parse-btn {
@@ -600,23 +625,52 @@ button:disabled {
   pointer-events: auto;
 }
 
-.dock-toggle {
-  font-size: 0.82rem;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 2px solid #f5c9d8;
-  background: #fff;
-  color: var(--pink-mid);
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: transform 0.15s ease;
+/* 麦克风外圈声波纹 */
+.fab-shell {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.dock-toggle:hover:not(:disabled) {
-  transform: scale(1.02);
+.fab-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 68px;
+  height: 68px;
+  margin-left: -34px;
+  margin-top: -34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 143, 171, 0.55);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fab-shell.is-active .fab-ripple {
+  animation: fabRipple 1.35s ease-out infinite;
+}
+
+.fab-shell.is-active .fab-ripple--2 {
+  animation-delay: 0.45s;
+}
+
+@keyframes fabRipple {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
 }
 
 .fab {
+  position: relative;
+  z-index: 2;
   width: 68px;
   height: 68px;
   border-radius: 50%;
@@ -638,19 +692,16 @@ button:disabled {
 }
 
 .fab.recording {
-  animation: pulseFab 1.1s ease-in-out infinite;
   background: linear-gradient(160deg, var(--pink-mid), var(--pink-deep));
+  animation: fabGlow 1.15s ease-in-out infinite alternate;
 }
 
-@keyframes pulseFab {
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 12px 28px rgba(255, 143, 171, 0.5);
+@keyframes fabGlow {
+  from {
+    box-shadow: 0 10px 24px rgba(255, 107, 158, 0.45);
   }
-  50% {
-    transform: scale(1.06);
-    box-shadow: 0 16px 36px rgba(255, 73, 124, 0.55);
+  to {
+    box-shadow: 0 14px 36px rgba(255, 73, 124, 0.55);
   }
 }
 

@@ -140,7 +140,7 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechMsg = $('speech-support-msg');
   const micHold = $('mic-hold');
-  const micToggle = $('mic-toggle');
+  const fabShell = $('fab-shell');
   const recState = $('rec-state');
   const transcript = $('transcript');
   const btnParse = $('btn-parse');
@@ -150,12 +150,14 @@
   const parseCards = $('parse-cards');
 
   let recognition = null;
-  let recModeToggle = false;
-  let pointerHeld = false;
+  /** 用户是否已点麦克风开始识别（与 recognition 是否在跑略不同步，以点击为准） */
+  let micListening = false;
 
   function setRecUi(active) {
     micHold.classList.toggle('recording', active);
-    recState.textContent = active ? '录音中…' : '未录音';
+    micHold.setAttribute('aria-pressed', active ? 'true' : 'false');
+    if (fabShell) fabShell.classList.toggle('is-active', active);
+    recState.textContent = active ? '识别中…' : '未录音';
     recState.className = 'badge' + (active ? ' warn' : '');
   }
 
@@ -168,11 +170,11 @@
     speechMsg.textContent = '当前浏览器不支持 Web Speech API（可尝试桌面 Chrome / Edge）。';
   } else {
     speechMsg.textContent =
-      '使用浏览器语音识别（需麦克风权限）：按住底部粉色麦克风说话，或点「点击开始识别」切换。';
+      '使用浏览器语音识别（需麦克风权限）：点底部粉色麦克风开始，再点一次结束；识别中会有声波纹动画。';
     recognition = new SR();
     recognition.lang = 'zh-CN';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
 
     recognition.onresult = (e) => {
       let finalText = '';
@@ -195,74 +197,51 @@
     };
 
     recognition.onerror = (e) => {
-      parseError.hidden = false;
-      parseError.textContent = `语音识别错误：${e.error}`;
+      micListening = false;
       setRecUi(false);
+      parseError.hidden = false;
+      const code = e && e.error ? String(e.error) : 'unknown';
+      if (code === 'network') {
+        parseError.textContent =
+          '语音识别「网络」错误：多为浏览器连不上语音服务（移动网络/地区限制较常见）。可换 Wi‑Fi、开 VPN 或换桌面 Chrome；也可直接在上方输入文字后点「开始解析」。';
+      } else {
+        parseError.textContent = `语音识别错误：${code}`;
+      }
     };
 
     recognition.onend = () => {
       if (speechInterimBuffer.trim()) {
         appendTranscript(speechInterimBuffer.trim());
         speechInterimBuffer = '';
-        parseStatus.textContent = '已把最后一次识别内容写入文本框（可点「解析」）。';
+        parseStatus.textContent = '已把最后一次识别内容写入文本框（可点「开始解析」）。';
       }
-      if (pointerHeld || recModeToggle) {
-        /* toggle mode: user stops explicitly */
-      }
+      micListening = false;
       setRecUi(false);
-      if (recModeToggle) {
-        recModeToggle = false;
-        micToggle.textContent = '点击开始识别';
-      }
     };
 
-    function safeStart() {
+    micHold.disabled = false;
+    btnParse.disabled = false;
+
+    micHold.addEventListener('click', () => {
+      if (micListening) {
+        try {
+          recognition.stop();
+        } catch {
+          /* ignore */
+        }
+        micListening = false;
+        setRecUi(false);
+        return;
+      }
       parseError.hidden = true;
       try {
         recognition.start();
+        micListening = true;
         setRecUi(true);
       } catch {
-        parseStatus.textContent = '识别已在运行；请先停止再试。';
-      }
-    }
-
-    function safeStop() {
-      try {
-        recognition.stop();
-      } catch {
-        /* ignore */
-      }
-      setRecUi(false);
-    }
-
-    micHold.disabled = false;
-    micToggle.disabled = false;
-    btnParse.disabled = false;
-
-    micHold.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      pointerHeld = true;
-      safeStart();
-    });
-    micHold.addEventListener('pointerup', () => {
-      if (!pointerHeld) return;
-      pointerHeld = false;
-      safeStop();
-    });
-    micHold.addEventListener('pointercancel', () => {
-      pointerHeld = false;
-      safeStop();
-    });
-
-    micToggle.addEventListener('click', () => {
-      if (!recModeToggle) {
-        recModeToggle = true;
-        micToggle.textContent = '点击停止识别';
-        safeStart();
-      } else {
-        recModeToggle = false;
-        micToggle.textContent = '点击开始识别';
-        safeStop();
+        micListening = false;
+        setRecUi(false);
+        parseStatus.textContent = '识别已在运行或启动失败，请稍后再点麦克风重试。';
       }
     });
   }
@@ -300,11 +279,12 @@ ${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
     btnSave.disabled = true;
     if (!text) {
       parseError.hidden = false;
-      parseError.textContent =
-        '请先在文本框里输入或说话（说完请松手/点停止，临时识别会自动写入文本框）。';
+      parseError.textContent = '请先在上方输入文字，或点底部麦克风识别后再点「开始解析」。';
       return;
     }
-    parseStatus.textContent = '解析中…';
+    btnParse.disabled = true;
+    btnParse.classList.add('is-loading');
+    parseStatus.textContent = '解析中…（AI 通常需几秒到二十秒，请稍候）';
     try {
       const data = await apiFetch('/api/parse', {
         method: 'POST',
@@ -323,6 +303,9 @@ ${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
       parseError.hidden = false;
       parseError.textContent = friendlyFetchError(e, e.status) || e.message || '解析失败';
       parseStatus.textContent = '';
+    } finally {
+      btnParse.classList.remove('is-loading');
+      btnParse.disabled = false;
     }
   });
 

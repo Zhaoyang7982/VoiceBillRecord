@@ -39,6 +39,8 @@
 
   let lastParsed = null;
   let chart = null;
+  /** 语音识别尚未标为 final 的临时文本，松手时写入文本框，避免点解析时仍为空 */
+  let speechInterimBuffer = '';
 
   function localYMD(d) {
     const y = d.getFullYear();
@@ -75,7 +77,12 @@
       data = { error: 'invalid_response', raw: text.slice(0, 200) };
     }
     if (!res.ok) {
-      const err = new Error(data && data.message ? data.message : `请求失败 ${res.status}`);
+      let msg = data && data.message ? data.message : `请求失败 ${res.status}`;
+      if (res.status === 404 && !getApiBase()) {
+        msg =
+          '请求 404：未配置 API 根地址。GitHub Pages 没有后端接口，请展开「可选设置」，填写 Vercel 上的地址（如 https://xxx.vercel.app）并点「保存 API 地址」。';
+      }
+      const err = new Error(msg);
       err.status = res.status;
       err.body = data;
       throw err;
@@ -108,12 +115,26 @@
     el.value = localStorage.getItem(API_BASE_STORAGE_KEY) || getApiBase() || '';
   }
 
+  function updatePagesApiHint() {
+    const el = $('pages-api-hint');
+    if (!el) return;
+    if (!getApiBase() && /github\.io$/i.test(location.hostname)) {
+      el.hidden = false;
+      el.textContent =
+        '当前在 GitHub Pages：请先展开下方「可选设置」，把「API 根地址」填成你的 Vercel 站点（https://xxx.vercel.app，无尾斜杠），再点「保存 API 地址」，否则无法解析与记账。';
+    } else {
+      el.hidden = true;
+      el.textContent = '';
+    }
+  }
+
   $('save-api-base').addEventListener('click', () => {
     const raw = $('api-base-url').value.trim();
     if (!raw) {
       localStorage.removeItem(API_BASE_STORAGE_KEY);
       $('parse-status').textContent = '已清除 API 根地址，将使用与当前页同域的 /api/*。';
       fillApiBaseInput();
+      updatePagesApiHint();
       return;
     }
     try {
@@ -126,6 +147,7 @@
       localStorage.setItem(API_BASE_STORAGE_KEY, origin);
       $('api-base-url').value = origin;
       $('parse-status').textContent = `API 根地址已保存：${origin}`;
+      updatePagesApiHint();
     } catch (e) {
       $('parse-status').textContent = e instanceof Error ? e.message : 'API 地址无效';
     }
@@ -134,8 +156,10 @@
     localStorage.removeItem(API_BASE_STORAGE_KEY);
     fillApiBaseInput();
     $('parse-status').textContent = '已清除 API 根地址。';
+    updatePagesApiHint();
   });
   fillApiBaseInput();
+  updatePagesApiHint();
 
   $('save-gate').addEventListener('click', () => {
     const v = $('gate-token').value.trim();
@@ -197,10 +221,12 @@
         else interim += piece;
       }
       if (interim) {
+        speechInterimBuffer = interim;
         parseStatus.textContent = `识别中：${interim}`;
       }
       if (finalText) {
         appendTranscript(finalText.trim());
+        speechInterimBuffer = '';
         parseStatus.textContent = '已写入一条最终识别结果。';
       }
     };
@@ -212,6 +238,11 @@
     };
 
     recognition.onend = () => {
+      if (speechInterimBuffer.trim()) {
+        appendTranscript(speechInterimBuffer.trim());
+        speechInterimBuffer = '';
+        parseStatus.textContent = '已把最后一次识别内容写入文本框（可点「解析」）。';
+      }
       if (pointerHeld || recModeToggle) {
         /* toggle mode: user stops explicitly */
       }
@@ -281,14 +312,20 @@
   }
 
   $('btn-parse').addEventListener('click', async () => {
-    const text = transcript.value.trim();
+    let text = transcript.value.trim();
+    if (!text && speechInterimBuffer.trim()) {
+      text = speechInterimBuffer.trim();
+      appendTranscript(text);
+      speechInterimBuffer = '';
+    }
     parseError.hidden = true;
     parsePreview.style.display = 'none';
     lastParsed = null;
     btnSave.disabled = true;
     if (!text) {
       parseError.hidden = false;
-      parseError.textContent = '请先说话或输入要解析的文字。';
+      parseError.textContent =
+        '请先在文本框里输入或说话（说完请松手/点停止，临时识别会自动写入）；若在 GitHub Pages，还需在「可选设置」里配置 Vercel API 根地址。';
       return;
     }
     parseStatus.textContent = '解析中…';
@@ -493,14 +530,14 @@
             {
               data: values,
               backgroundColor: labels.map((_, i) => palette[i % palette.length]),
-              borderWidth: 1,
-              borderColor: '#111820',
+              borderWidth: 2,
+              borderColor: '#ffffff',
             },
           ],
         },
         options: {
           plugins: {
-            legend: { labels: { color: '#e7ecf3' } },
+            legend: { labels: { color: '#3d5349', font: { size: 12 } } },
           },
         },
       });

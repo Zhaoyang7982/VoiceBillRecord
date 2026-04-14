@@ -51,6 +51,10 @@
    `node -v` 与 `npm -v` 有版本号输出后，在项目根目录执行：  
    `npm install && npm test`
 
+### 国内网络（可选）
+
+若 `brew` / `npm` 访问 GitHub 较慢，可在本机按 [docs/国内镜像配置.md](./docs/国内镜像配置.md) 配置清华 Homebrew 与 npmmirror（修改 `~/.zshrc` / `~/.npmrc` 后需新开终端或 `source ~/.zshrc`）。
+
 ### 日常命令
 
 - 安装依赖：`npm install`；若已提交 `package-lock.json`，推荐使用 `npm ci`。

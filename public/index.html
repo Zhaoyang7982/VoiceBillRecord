@@ -6,82 +6,96 @@
     <title>语音记账 · VoiceBillRecord</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <header class="app-header">
-      <h1>语音记账</h1>
-      <nav class="tabs" aria-label="主导航">
-        <button type="button" data-nav="home" aria-current="true">首页</button>
-        <button type="button" data-nav="list">列表</button>
-        <button type="button" data-nav="stats">统计</button>
-      </nav>
-    </header>
+  <body class="show-fab">
+    <aside class="sidebar" aria-label="主导航">
+      <button type="button" class="nav-item" data-nav="home" aria-current="true" title="首页（记账）">🏠</button>
+      <button type="button" class="nav-item" data-nav="list" title="账单支出">📋</button>
+      <button type="button" class="nav-item" data-nav="stats" title="本月分析">📊</button>
+      <button type="button" class="nav-item" data-nav="year" title="年度分析">📈</button>
+    </aside>
 
-    <main id="view-home" class="view" role="region" aria-label="首页">
-      <section class="panel">
-        <h2>说话记账</h2>
-        <p class="muted" id="speech-support-msg">
-          正在检测语音识别能力…
-        </p>
-        <button type="button" class="big-mic" id="mic-hold" disabled>
-          按住说话（或下方点击切换）
-        </button>
-        <div class="row" style="margin-top: 0.65rem">
-          <button type="button" class="ghost" id="mic-toggle" disabled>点击开始识别</button>
+    <div class="app-shell">
+      <main id="view-home" class="view" role="region" aria-label="首页记账">
+        <h1 class="page-title">记账</h1>
+        <p class="support-msg" id="speech-support-msg">正在检测语音识别能力…</p>
+
+        <label class="sr-only" for="transcript">识别文字（可编辑）</label>
+        <textarea
+          id="transcript"
+          class="top-input transcript-area"
+          rows="2"
+          placeholder="语音转文字会出现在这里，也可手动输入后解析…"
+          aria-label="语音转文字与编辑区"
+        ></textarea>
+
+        <p class="tip">每次最多支持 <strong>3</strong> 条账单口语，超过请分次记录哦～</p>
+
+        <div class="action-row">
           <span class="badge" id="rec-state">未录音</span>
+          <button type="button" class="parse-btn" id="btn-parse" disabled>开始解析</button>
+          <button type="button" class="save-btn" id="btn-save" disabled>保存账单</button>
         </div>
-      </section>
-
-      <section class="panel">
-        <h2>识别文字</h2>
-        <textarea id="transcript" placeholder="识别结果会出现在这里，也可手动编辑后再解析"></textarea>
-        <div class="row" style="margin-top: 0.65rem">
-          <button type="button" class="primary" id="btn-parse" disabled>解析（AI）</button>
-          <button type="button" class="ghost" id="btn-save" disabled>保存账单</button>
-        </div>
-        <p class="muted" id="parse-status"></p>
+        <p class="parse-status muted" id="parse-status"></p>
         <p class="error" id="parse-error" hidden></p>
-        <pre
-          id="parse-preview"
-          class="panel"
-          style="display: none; margin-top: 0.65rem; font-size: 0.82rem; overflow: auto"
-        ></pre>
-      </section>
 
-      <section class="panel">
-        <h2>今日总支出</h2>
-        <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0" id="today-total">—</p>
-        <p class="muted">最近几条</p>
-        <ul class="expense-list" id="recent-list"></ul>
-        <div class="row" style="margin-top: 0.65rem">
-          <button type="button" class="ghost" id="refresh-home">刷新</button>
-        </div>
-      </section>
-    </main>
+        <div id="parse-cards" class="parse-cards" hidden></div>
 
-    <main id="view-list" class="view" hidden role="region" aria-label="列表">
-      <section class="panel">
-        <h2>按天分组</h2>
-        <p class="muted">展示最近 60 天内的记录（最多 500 条）</p>
+        <section class="today-block" aria-label="今日概览">
+          <div class="total-card">
+            <span>今日总支出</span>
+            <h2 id="today-total">—</h2>
+          </div>
+          <p class="section-label">最近几条</p>
+          <div id="recent-list" class="bill-cards"></div>
+          <button type="button" class="ghost-btn" id="refresh-home">刷新</button>
+        </section>
+      </main>
+
+      <main id="view-list" class="view" hidden role="region" aria-label="账单按日">
+        <h1 class="page-title">账单明细</h1>
+        <p class="muted subhead">最近 60 天内（最多 500 条）</p>
         <div id="list-mount"></div>
-        <div class="row" style="margin-top: 0.65rem">
-          <button type="button" class="ghost" id="refresh-list">刷新</button>
-        </div>
-      </section>
-    </main>
+        <button type="button" class="ghost-btn" id="refresh-list">刷新</button>
+      </main>
 
-    <main id="view-stats" class="view" hidden role="region" aria-label="统计">
-      <section class="panel">
-        <h2>本月分类</h2>
-        <p class="muted" id="stats-range"></p>
-        <div class="stats-wrap chart-box">
-          <canvas id="stats-chart" width="400" height="260" aria-label="分类饼图"></canvas>
+      <main id="view-stats" class="view" hidden role="region" aria-label="本月分析">
+        <h1 class="page-title">本月支出分析</h1>
+        <p class="muted subhead" id="stats-range"></p>
+        <div class="total-card">
+          <span>本月分类合计</span>
+          <h2 id="stats-month-total">—</h2>
         </div>
-        <ul class="expense-list" id="stats-legend"></ul>
-        <div class="row" style="margin-top: 0.65rem">
-          <button type="button" class="ghost" id="refresh-stats">刷新</button>
+        <div class="chart-box">
+          <canvas id="stats-chart" width="320" height="280" aria-label="分类饼图"></canvas>
         </div>
-      </section>
-    </main>
+        <ul class="category-list" id="stats-legend"></ul>
+        <button type="button" class="ghost-btn" id="refresh-stats">刷新</button>
+      </main>
+
+      <main id="view-year" class="view" hidden role="region" aria-label="年度分析">
+        <h1 class="page-title">年度分析</h1>
+        <div class="year-card">
+          <span><span id="year-label"></span> 年度总支出</span>
+          <h2 id="year-total">—</h2>
+        </div>
+        <div class="trend-box" id="year-trend">加载中…</div>
+        <div id="year-months" class="month-list"></div>
+        <div class="slogan-box">
+          <h3>省钱小语录</h3>
+          <p>
+            每一笔记录都是对生活的掌控<br />
+            理性消费，快乐存钱<br />
+            你认真生活的样子，超可爱！
+          </p>
+        </div>
+        <button type="button" class="ghost-btn" id="refresh-year">刷新</button>
+      </main>
+    </div>
+
+    <div class="bottom-dock" role="group" aria-label="语音输入">
+      <button type="button" class="dock-toggle" id="mic-toggle" disabled>点击开始识别</button>
+      <button type="button" class="fab" id="mic-hold" disabled aria-label="按住说话">🎤</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
     <!-- 仅当 Vercel Production 与仓库默认域名不一致、或需走已备案自定义域名时取消注释（https、无路径、无密钥） -->

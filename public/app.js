@@ -59,6 +59,7 @@
     home: $('view-home'),
     list: $('view-list'),
     stats: $('view-stats'),
+    year: $('view-year'),
   };
 
   let lastParsed = null;
@@ -116,21 +117,23 @@
   }
 
   function showNav(name) {
-    document.querySelectorAll('nav.tabs button').forEach((btn) => {
+    document.querySelectorAll('.sidebar [data-nav]').forEach((btn) => {
       btn.setAttribute('aria-current', btn.dataset.nav === name ? 'true' : 'false');
     });
+    document.body.classList.toggle('show-fab', name === 'home');
     Object.entries(views).forEach(([k, el]) => {
       if (!el) return;
       el.hidden = k !== name;
     });
   }
 
-  document.querySelectorAll('nav.tabs button').forEach((btn) => {
+  document.querySelectorAll('.sidebar [data-nav]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const name = btn.dataset.nav;
       showNav(name);
       if (name === 'list') loadList();
       if (name === 'stats') loadStats();
+      if (name === 'year') loadYear();
     });
   });
 
@@ -144,7 +147,7 @@
   const btnSave = $('btn-save');
   const parseStatus = $('parse-status');
   const parseError = $('parse-error');
-  const parsePreview = $('parse-preview');
+  const parseCards = $('parse-cards');
 
   let recognition = null;
   let recModeToggle = false;
@@ -165,7 +168,7 @@
     speechMsg.textContent = '当前浏览器不支持 Web Speech API（可尝试桌面 Chrome / Edge）。';
   } else {
     speechMsg.textContent =
-      '使用浏览器语音识别（Web Speech），需麦克风权限；按住主按钮说话，或点击「点击开始识别」切换。';
+      '使用浏览器语音识别（需麦克风权限）：按住底部粉色麦克风说话，或点「点击开始识别」切换。';
     recognition = new SR();
     recognition.lang = 'zh-CN';
     recognition.interimResults = true;
@@ -266,8 +269,20 @@
 
   function showParsed(p) {
     lastParsed = p;
-    parsePreview.style.display = 'block';
-    parsePreview.textContent = JSON.stringify(p, null, 2);
+    parseCards.innerHTML = '';
+    parseCards.hidden = false;
+    const card = document.createElement('div');
+    card.className = 'card';
+    const amt =
+      p.amount !== null && p.amount !== undefined && Number.isFinite(Number(p.amount))
+        ? money(Number(p.amount))
+        : '—';
+    card.innerHTML = `<h4>${escapeHtml(p.shop || '未命名')}</h4>
+<p>金额：${escapeHtml(amt)}</p>
+<p>分类：${escapeHtml(p.category || '')}</p>
+<p class="muted">日期：${escapeHtml(p.time || '')}</p>
+${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
+    parseCards.appendChild(card);
     btnSave.disabled = !(p && p.amount !== null && p.amount !== undefined);
   }
 
@@ -279,7 +294,8 @@
       speechInterimBuffer = '';
     }
     parseError.hidden = true;
-    parsePreview.style.display = 'none';
+    parseCards.innerHTML = '';
+    parseCards.hidden = true;
     lastParsed = null;
     btnSave.disabled = true;
     if (!text) {
@@ -352,30 +368,33 @@
       const sum = items.reduce((s, it) => s + Number(it.amount), 0);
       totalEl.textContent = money(sum);
       items.slice(0, 8).forEach((it) => {
-        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'bill-card';
         const left = document.createElement('div');
-        left.innerHTML = `<strong>${money(it.amount)}</strong> · ${escapeHtml(it.category)}<div class="muted">${escapeHtml(
-          it.shop || it.note || '',
+        left.className = 'bill-left';
+        left.innerHTML = `<div class="name">${escapeHtml(it.shop || it.note || '账单')}</div><div class="cate">${escapeHtml(
+          it.category || '',
         )}</div>`;
         const right = document.createElement('div');
-        right.className = 'muted';
-        right.style.whiteSpace = 'nowrap';
-        right.textContent = formatTime(it.occurred_at);
-        li.appendChild(left);
-        li.appendChild(right);
-        listEl.appendChild(li);
+        right.className = 'bill-right';
+        right.textContent = money(it.amount);
+        row.appendChild(left);
+        row.appendChild(right);
+        listEl.appendChild(row);
       });
       if (!items.length) {
-        const li = document.createElement('li');
-        li.innerHTML = '<span class="muted">请语音输入账单，当前还没有账单</span>';
-        listEl.appendChild(li);
+        const empty = document.createElement('div');
+        empty.className = 'list-empty';
+        empty.textContent = '还没有今天的账单，去记一笔吧～';
+        listEl.appendChild(empty);
       }
     } catch (e) {
       totalEl.textContent = '—';
-      const li = document.createElement('li');
-      li.className = 'error';
-      li.textContent = friendlyFetchError(e, e.status) || e.message || '加载失败';
-      listEl.appendChild(li);
+      const err = document.createElement('div');
+      err.className = 'error';
+      err.style.textAlign = 'center';
+      err.textContent = friendlyFetchError(e, e.status) || e.message || '加载失败';
+      listEl.appendChild(err);
     }
   }
 
@@ -416,39 +435,45 @@
       mount.innerHTML = '';
       const days = Array.from(groups.keys()).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
       if (!days.length) {
-        mount.innerHTML = '<p class="muted">请语音输入账单，当前还没有账单</p>';
+        mount.innerHTML = '<p class="list-empty">还没有账单，去首页记一笔吧～</p>';
         return;
       }
       days.forEach((day) => {
-        const wrap = document.createElement('div');
-        wrap.className = 'day-group';
-        const h = document.createElement('h3');
-        h.textContent = day;
-        const ul = document.createElement('ul');
-        ul.className = 'expense-list';
-        groups.get(day).forEach((it) => {
-          const li = document.createElement('li');
+        const dayItems = groups.get(day);
+        const daySum = dayItems.reduce((s, it) => s + Number(it.amount), 0);
+        const head = document.createElement('div');
+        head.className = 'date-group';
+        head.textContent = `📅 ${day}`;
+        mount.appendChild(head);
+        const summary = document.createElement('div');
+        summary.className = 'day-summary';
+        summary.innerHTML = `<span>当日总支出</span><span class="cost">${money(daySum)}</span>`;
+        mount.appendChild(summary);
+        const cards = document.createElement('div');
+        cards.className = 'bill-cards';
+        dayItems.forEach((it) => {
+          const row = document.createElement('div');
+          row.className = 'bill-card';
           const left = document.createElement('div');
-          left.innerHTML = `<strong>${money(it.amount)}</strong> · ${escapeHtml(it.category)}<div class="muted">${escapeHtml(
-            it.shop || '',
+          left.className = 'bill-left';
+          left.innerHTML = `<div class="name">${escapeHtml(it.shop || it.note || '账单')}</div><div class="cate">${escapeHtml(
+            it.category || '',
           )}</div>`;
           const right = document.createElement('div');
-          right.className = 'muted';
-          right.textContent = formatTime(it.occurred_at);
-          li.appendChild(left);
-          li.appendChild(right);
-          ul.appendChild(li);
+          right.className = 'bill-right';
+          right.textContent = money(it.amount);
+          row.appendChild(left);
+          row.appendChild(right);
+          cards.appendChild(row);
         });
-        wrap.appendChild(h);
-        wrap.appendChild(ul);
-        mount.appendChild(wrap);
+        mount.appendChild(cards);
       });
     } catch (e) {
       mount.innerHTML = `<p class="error">${escapeHtml(friendlyFetchError(e, e.status) || e.message)}</p>`;
     }
   }
 
-  const palette = ['#3d9cf5', '#7fd99a', '#f5c15c', '#c79cff', '#f07178', '#5fd4d4', '#ffb86b', '#8b99a8'];
+  const palette = ['#ff8fab', '#ff6b9e', '#ff497c', '#ffadce', '#ffb7d5', '#ffa0c3', '#ff7eb3', '#e8a0c4'];
 
   async function loadStats() {
     const now = new Date();
@@ -456,7 +481,9 @@
     const to = lastDayOfMonth(now);
     $('stats-range').textContent = `${from} ~ ${to}`;
     const legend = $('stats-legend');
+    const monthTotalEl = $('stats-month-total');
     legend.innerHTML = '';
+    monthTotalEl.textContent = '…';
     try {
       const data = await apiFetch(`/api/expenses?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
       const items = data.items || [];
@@ -468,13 +495,15 @@
       const labels = Array.from(sums.keys());
       const values = labels.map((k) => sums.get(k));
       const total = values.reduce((a, b) => a + b, 0);
+      monthTotalEl.textContent = money(total);
 
-      labels.forEach((lab, i) => {
+      labels.forEach((lab) => {
         const li = document.createElement('li');
+        li.className = 'cat-item';
         const amt = sums.get(lab);
         const pct = total > 0 ? ((amt / total) * 100).toFixed(1) : '0.0';
-        li.innerHTML = `<div><span class="badge ok">${escapeHtml(lab)}</span></div><div class="muted">${money(
-          amt,
+        li.innerHTML = `<div class="cat-name">${escapeHtml(lab)}</div><div class="cat-amount">${escapeHtml(
+          money(amt),
         )} · ${pct}%</div>`;
         legend.appendChild(li);
       });
@@ -482,7 +511,7 @@
       const ctx = $('stats-chart').getContext('2d');
       if (chart) chart.destroy();
       if (!window.Chart) {
-        legend.innerHTML = '<li class="error">Chart.js 未能加载</li>';
+        legend.innerHTML = '<li class="cat-item error">Chart.js 未能加载</li>';
         return;
       }
       chart = new window.Chart(ctx, {
@@ -500,21 +529,93 @@
         },
         options: {
           plugins: {
-            legend: { labels: { color: '#3d5349', font: { size: 12 } } },
+            legend: { display: false },
           },
         },
       });
       if (!labels.length) {
-        legend.innerHTML = '<li class="muted">请语音输入账单，当前还没有账单</li>';
+        monthTotalEl.textContent = money(0);
+        legend.innerHTML = '<li class="cat-item muted" style="justify-content:center">本月还没有账单</li>';
       }
     } catch (e) {
-      legend.innerHTML = `<li class="error">${escapeHtml(friendlyFetchError(e, e.status) || e.message)}</li>`;
+      monthTotalEl.textContent = '—';
+      legend.innerHTML = `<li class="cat-item error">${escapeHtml(friendlyFetchError(e, e.status) || e.message)}</li>`;
+    }
+  }
+
+  async function loadYear() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const from = `${y}-01-01`;
+    const to = `${y}-12-31`;
+    const labelEl = $('year-label');
+    const totalEl = $('year-total');
+    const trendEl = $('year-trend');
+    const mount = $('year-months');
+    labelEl.textContent = String(y);
+    totalEl.textContent = '…';
+    trendEl.textContent = '加载中…';
+    mount.innerHTML = '';
+    try {
+      const data = await apiFetch(`/api/expenses?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+      const items = data.items || [];
+      const monthly = new Map();
+      items.forEach((it) => {
+        const d = new Date(it.occurred_at);
+        if (Number.isNaN(d.getTime())) return;
+        if (d.getFullYear() !== y) return;
+        const m = d.getMonth() + 1;
+        monthly.set(m, (monthly.get(m) || 0) + Number(it.amount));
+      });
+      const yearSum = items.reduce((s, it) => s + Number(it.amount), 0);
+      totalEl.textContent = money(yearSum);
+
+      const curM = now.getMonth() + 1;
+      const curVal = monthly.get(curM) || 0;
+      const prevVal = curM > 1 ? monthly.get(curM - 1) || 0 : 0;
+      if (prevVal > 0) {
+        const chg = (((curVal - prevVal) / prevVal) * 100).toFixed(0);
+        if (Number(chg) <= 0) {
+          trendEl.textContent = `本月较上月支出减少 ${Math.abs(Number(chg))}% ✨ 继续保持！`;
+        } else {
+          trendEl.textContent = `本月较上月支出上升 ${chg}% ，注意理性消费～`;
+        }
+      } else if (curVal > 0) {
+        trendEl.textContent = '本月已有记录，坚持记账更容易省钱 ✨';
+      } else {
+        trendEl.textContent = '多记账，更容易发现省钱空间 ✨';
+      }
+
+      const monthNames = ['1 月', '2 月', '3 月', '4 月', '5 月', '6 月', '7 月', '8 月', '9 月', '10 月', '11 月', '12 月'];
+      for (let m = 1; m <= 12; m += 1) {
+        const row = document.createElement('div');
+        row.className = 'month-item';
+        const isFuture = y === now.getFullYear() && m > curM;
+        if (isFuture) row.classList.add('future');
+        const name = document.createElement('div');
+        name.className = 'month-name';
+        name.textContent = monthNames[m - 1];
+        const amt = document.createElement('div');
+        amt.className = 'month-amount';
+        if (isFuture) {
+          amt.textContent = '—';
+        } else {
+          amt.textContent = money(monthly.get(m) || 0);
+        }
+        row.appendChild(name);
+        row.appendChild(amt);
+        mount.appendChild(row);
+      }
+    } catch (e) {
+      totalEl.textContent = '—';
+      trendEl.textContent = friendlyFetchError(e, e.status) || e.message || '加载失败';
     }
   }
 
   $('refresh-home').addEventListener('click', loadHome);
   $('refresh-list').addEventListener('click', loadList);
   $('refresh-stats').addEventListener('click', loadStats);
+  $('refresh-year').addEventListener('click', loadYear);
 
   loadHome();
 })();

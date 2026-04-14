@@ -296,6 +296,28 @@ button:disabled {
   gap: 14px;
 }
 
+.parse-stream {
+  width: 100%;
+  margin: 10px auto 12px;
+  padding: 12px 14px;
+  min-height: 2.5em;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #6a5a62;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #f5d4e0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.parse-stream[hidden] {
+  display: none !important;
+}
+
 .parse-cards[hidden] {
   display: none !important;
 }

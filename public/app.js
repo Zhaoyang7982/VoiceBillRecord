@@ -84,6 +84,103 @@
     return localYMD(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   }
 
+  /**
+   * 解析：默认流式（NDJSON），增量写入 #parse-stream；服务端显式 stream:false 时回退整段 JSON。
+   */
+  async function parseBillWithStream(text) {
+    const streamEl = $('parse-stream');
+    let res;
+    try {
+      res = await fetch(apiUrl('/api/parse'), {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: authHeaders(),
+        body: JSON.stringify({ text, stream: true }),
+      });
+    } catch (e) {
+      throw new Error(friendlyFetchError(e));
+    }
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!res.ok) {
+      const raw = await res.text();
+      let data = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        data = {};
+      }
+      const err = new Error((data && data.message) || (data && data.error) || `请求失败 ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    if (ct.includes('ndjson') && res.body) {
+      streamEl.hidden = false;
+      streamEl.textContent = '';
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buffer = '';
+      let acc = '';
+      let doneParsed = null;
+      let sawDelta = false;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += dec.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let obj;
+          try {
+            obj = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (obj.type === 'delta' && obj.c) {
+            acc += obj.c;
+            streamEl.textContent = acc;
+            streamEl.scrollTop = streamEl.scrollHeight;
+            if (!sawDelta) {
+              sawDelta = true;
+              const ps = $('parse-status');
+              if (ps) ps.textContent = '模型输出中…';
+            }
+          }
+          if (obj.type === 'done' && obj.parsed) {
+            doneParsed = obj.parsed;
+          }
+          if (obj.type === 'error') {
+            throw new Error(obj.message || obj.error || '解析失败');
+          }
+        }
+      }
+      if (buffer.trim()) {
+        try {
+          const obj = JSON.parse(buffer.trim());
+          if (obj.type === 'done' && obj.parsed) doneParsed = obj.parsed;
+          if (obj.type === 'error') throw new Error(obj.message || obj.error || '解析失败');
+        } catch (e) {
+          if (e instanceof SyntaxError) {
+            /* 末行可能不完整，忽略 */
+          } else {
+            throw e;
+          }
+        }
+      }
+      streamEl.hidden = true;
+      if (!doneParsed) {
+        throw new Error('流式解析未返回有效结果');
+      }
+      return doneParsed;
+    }
+    const data = await res.json();
+    if (!data || typeof data.parsed !== 'object') {
+      throw new Error((data && data.message) || '解析接口返回数据异常');
+    }
+    return data.parsed;
+  }
+
   async function apiFetch(path, opts) {
     let res;
     try {
@@ -286,18 +383,12 @@ ${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
     }
     btnParse.disabled = true;
     btnParse.classList.add('is-loading');
-    parseStatus.textContent = '解析中…（AI 通常需几秒到二十秒，请稍候）';
+    parseStatus.textContent = '正在连接模型…';
     try {
-      const data = await apiFetch('/api/parse', {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      });
-      if (!data || typeof data.parsed !== 'object') {
-        throw new Error((data && data.message) || '解析接口返回数据异常');
-      }
-      showParsed(data.parsed);
+      const parsed = await parseBillWithStream(text);
+      showParsed(parsed);
       parseStatus.textContent = '解析完成。';
-      if (data.parsed.amount === null || data.parsed.amount === undefined) {
+      if (parsed.amount === null || parsed.amount === undefined) {
         parseError.hidden = false;
         parseError.textContent = '未识别到金额：请补充口述或手动改文案后再解析；无法保存无金额账单。';
       }
@@ -308,6 +399,7 @@ ${p.note ? `<p class="muted">${escapeHtml(p.note)}</p>` : ''}`;
     } finally {
       btnParse.classList.remove('is-loading');
       btnParse.disabled = false;
+      $('parse-stream').hidden = true;
     }
   });
 

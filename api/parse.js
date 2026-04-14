@@ -1,4 +1,5 @@
-import { checkGate, getCorsHeaders, readJsonBody, sendJson } from '../lib/api-http.js';
+import { checkGate, getCorsHeaders, mergeHeaders, readJsonBody, sendJson } from '../lib/api-http.js';
+import { consumeOpenAiChatSse } from '../lib/openai-sse-stream.js';
 
 /** 与 Prompt、POST /api/expenses 校验一致（含「通讯」） */
 const ALLOWED_CATEGORIES = ['餐饮', '交通', '购物', '娱乐', '医疗', '住房', '通讯', '其他'];
@@ -11,10 +12,6 @@ function yesterdayInShanghai() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' });
 }
 
-/**
- * DeepSeek 官方：POST {base}/chat/completions
- * base 可为 https://api.deepseek.com 或 https://api.deepseek.com/v1（与模型版本无关）
- */
 function deepSeekChatCompletionsUrl() {
   const raw = (process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
   if (/\/chat\/completions$/i.test(raw)) return raw;
@@ -72,6 +69,70 @@ function normalizeParsed(raw) {
   };
 }
 
+function writeNdjsonLine(res, obj) {
+  res.write(`${JSON.stringify(obj)}\n`);
+}
+
+/**
+ * 流式：DeepSeek SSE → 本接口以 NDJSON 增量下发 {type:'delta',c}，最后 {type:'done',parsed}
+ */
+async function handleStreamParse(res, cors, llmRes) {
+  const streamHeaders = mergeHeaders(cors, {
+    'Content-Type': 'application/x-ndjson; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.writeHead(200, streamHeaders);
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  let flushed = 0;
+  const flushChunk = () => {
+    flushed += 1;
+    if (flushed % 8 === 0 && typeof res.flush === 'function') res.flush();
+  };
+
+  try {
+    const reader = llmRes.body.getReader();
+    const full = await consumeOpenAiChatSse(reader, (piece) => {
+      writeNdjsonLine(res, { type: 'delta', c: piece });
+      flushChunk();
+    });
+
+    let parsed;
+    try {
+      parsed = extractJsonObject(full);
+    } catch (e) {
+      writeNdjsonLine(res, {
+        type: 'error',
+        error: 'parse_json_failed',
+        message: e instanceof Error ? e.message : '无法解析模型输出为 JSON',
+      });
+      res.end();
+      return;
+    }
+
+    writeNdjsonLine(res, { type: 'done', ok: true, parsed: normalizeParsed(parsed) });
+    res.end();
+  } catch (e) {
+    const aborted = e && e.name === 'AbortError';
+    try {
+      writeNdjsonLine(res, {
+        type: 'error',
+        error: aborted ? 'deepseek_timeout' : 'stream_failed',
+        message: aborted ? '解析超时' : e instanceof Error ? e.message : '流式读取失败',
+      });
+    } catch {
+      /* 客户端已断开 */
+    }
+    try {
+      res.end();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export default async function handler(req, res) {
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -101,6 +162,9 @@ export default async function handler(req, res) {
     return;
   }
 
+  /** 仅当 `stream: true` 时走 NDJSON 流式；否则返回整段 JSON（兼容 curl / 旧前端） */
+  const wantStream = body.stream === true;
+
   const key = process.env.DEEPSEEK_API_KEY;
   const model = (process.env.DEEPSEEK_MODEL || 'deepseek-chat').trim();
   if (!key) {
@@ -114,7 +178,7 @@ export default async function handler(req, res) {
   const prompt = buildPrompt(text);
   const url = deepSeekChatCompletionsUrl();
   const controller = new AbortController();
-  const timeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS || 25_000);
+  const timeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS || 60_000);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   let llmRes;
@@ -130,23 +194,23 @@ export default async function handler(req, res) {
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.15,
         max_tokens: 160,
-        stream: false,
+        stream: wantStream,
       }),
       signal: controller.signal,
     });
   } catch (e) {
+    clearTimeout(timeout);
     const aborted = e && e.name === 'AbortError';
     sendJson(res, aborted ? 504 : 502, cors, {
       error: aborted ? 'deepseek_timeout' : 'deepseek_network_error',
       message: aborted ? '解析超时，请稍后重试' : '无法连接 DeepSeek 服务',
     });
     return;
-  } finally {
-    clearTimeout(timeout);
   }
 
-  const data = await llmRes.json().catch(() => ({}));
   if (!llmRes.ok) {
+    clearTimeout(timeout);
+    const data = await llmRes.json().catch(() => ({}));
     sendJson(res, 502, cors, {
       error: 'deepseek_upstream_error',
       message: data.error?.message || `DeepSeek 接口返回 ${llmRes.status}`,
@@ -154,6 +218,23 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (wantStream) {
+    if (!llmRes.body) {
+      clearTimeout(timeout);
+      sendJson(res, 502, cors, { error: 'no_response_body', message: '上游未返回可读的流式正文' });
+      return;
+    }
+    try {
+      await handleStreamParse(res, cors, llmRes);
+    } finally {
+      clearTimeout(timeout);
+    }
+    return;
+  }
+
+  clearTimeout(timeout);
+
+  const data = await llmRes.json().catch(() => ({}));
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== 'string') {
     sendJson(res, 502, cors, { error: 'deepseek_empty_content', message: '模型未返回内容' });

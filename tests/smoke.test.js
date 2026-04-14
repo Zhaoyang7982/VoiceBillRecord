@@ -48,6 +48,7 @@ describe('repo harness', () => {
     expect(existsSync(join(repoRoot, 'api', 'expenses.js'))).toBe(true);
     expect(existsSync(join(repoRoot, 'db', 'schema.sql'))).toBe(true);
     expect(existsSync(join(repoRoot, 'lib', 'api-http.js'))).toBe(true);
+    expect(existsSync(join(repoRoot, 'lib', 'openai-sse-stream.js'))).toBe(true);
   });
 });
 
